@@ -1,0 +1,161 @@
+name: Build linux-eaglercraftos
+
+# Custom kernel 7.0.14-eaglercraftos for Debian bookworm(12)/trixie(13)/forky(14)
+# × amd64/arm64, plus a signed APT repo (repo/ with KEY.gpg).
+# Native builds only: amd64 jobs run on ubuntu-24.04, arm64 on ubuntu-24.04-arm.
+# No QEMU, no cross-compilers.
+#
+# INSTALL: copy this file to .github/workflows/build.yml in your git repo root.
+# (This editor's src/ cannot hold dot-folders, so it lives here as
+#  github-workflows/build.yml.)
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      debian:
+        description: "Debian version(s) to build (comma list, empty = all)"
+        required: false
+        default: ""
+      kernel_version:
+        description: "Override kernel version (default: from VERSION file)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write  # needed for `gh release upload` on tags
+
+env:
+  KERNEL_VERSION_FALLBACK: "7.0.14"
+
+jobs:
+  build:
+    name: build-${{ matrix.debian }}-${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        debian: [bookworm, trixie, forky]
+        arch: [amd64, arm64]
+    # EXACT runner images required by spec:
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select kernel version
+        id: kver
+        run: |
+          if [ -n "${{ inputs.kernel_version }}" ]; then
+            echo "kver=${{ inputs.kernel_version }}" >> "$GITHUB_OUTPUT"
+          elif [ -f VERSION ]; then
+            echo "kver=$(cut -d- -f1 < VERSION | tr -d ' \n')" >> "$GITHUB_OUTPUT"
+          else
+            echo "kver=$KERNEL_VERSION_FALLBACK" >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
+
+      - name: Free disk space (kernel builds are hungry)
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo apt-get clean || true
+          df -h
+
+      - name: Build in Debian container (native arch, no QEMU)
+        run: |
+          set -euo pipefail
+          DEBIAN_CODENAME="${{ matrix.debian }}"
+          KARCH="${{ matrix.arch }}"
+          echo "Runner: $(uname -m) — target: $KARCH on $DEBIAN_CODENAME (debian:$DEBIAN_CODENAME-slim)"
+          if [ "$KARCH" = "amd64" ] && [ "$(uname -m)" != "x86_64" ]; then
+            echo "arch mismatch: amd64 job landed on $(uname -m)" >&2; exit 1
+          fi
+          if [ "$KARCH" = "arm64" ] && [ "$(uname -m)" != "aarch64" ]; then
+            echo "arch mismatch: arm64 job landed on $(uname -m)" >&2; exit 1
+          fi
+          docker run --rm \
+            -v "$PWD:/work" -w /work \
+            "debian:${DEBIAN_CODENAME}-slim" \
+            bash -c "chmod +x scripts/*.sh && ./scripts/build.sh --debian $DEBIAN_CODENAME --arch $KARCH --no-docker --kernel-version '${{ steps.kver.outputs.kver }}'"
+
+      - name: List artifacts
+        run: |
+          ls -lh out/
+          cat out/SHA256SUMS || true
+
+      - name: Upload .debs
+        uses: actions/upload-artifact@v4
+        with:
+          name: eaglercraftos-${{ steps.kver.outputs.kver }}-${{ matrix.debian }}-${{ matrix.arch }}
+          path: |
+            out/*.deb
+            out/*.buildinfo
+            out/*.changes
+            out/config-*
+            out/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+  repo:
+    name: apt repo (bookworm/trixie/forky)
+    needs: [build]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all .deb artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: pkgs
+          merge-multiple: true
+
+      - name: Install repo tooling
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq dpkg-dev apt gnupg gzip xz-utils
+
+      - name: Build signed APT repo
+        run: |
+          set -euo pipefail
+          mkdir -p repo-in
+          find pkgs -name '*.deb' -exec cp -n {} repo-in/ \;
+          ls -lh repo-in/
+          chmod +x scripts/*.sh
+          if [ -n "${{ secrets.REPO_GPG_PRIVATE_KEY }}" ]; then
+            echo "${{ secrets.REPO_GPG_PRIVATE_KEY }}" | gpg --batch --import
+            KEYID="$(gpg --batch --list-secret-keys --with-colons | awk -F: '/^fpr:/{print $10; exit}')"
+            ./scripts/make-repo.sh --input repo-in --output repo --sign-key "$KEYID"
+          else
+            ./scripts/make-repo.sh --input repo-in --output repo --gen-key
+          fi
+
+      - name: Upload APT repo
+        uses: actions/upload-artifact@v4
+        with:
+          name: apt-repo
+          path: repo/
+          retention-days: 30
+
+  release:
+    name: attach to GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, repo]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -lh dist/
+          ( cd dist && tar -czf ../apt-repo.tar.gz KEY.gpg dists pool 2>/dev/null || tar -czf ../apt-repo.tar.gz . )
+          ls -lh ../apt-repo.tar.gz
+          gh release upload "${{ github.ref_name }}" dist/* ../apt-repo.tar.gz --clobber
