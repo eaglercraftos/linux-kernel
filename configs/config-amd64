@@ -1,0 +1,86 @@
+# EaglercraftOS amd64 fragment — merged over arch/x86/configs/x86_64_defconfig
+# via: scripts/kconfig/merge_config.sh -m .config configs/config-amd64
+# Lines use =y/=m; merge with -m tolerates arch-specific symbols.
+
+# --- identity ---
+CONFIG_LOCALVERSION="-eaglercraftos"
+# CONFIG_LOCALVERSION_AUTO is not set
+
+# --- scheduler / timers (desktop + browser-game latency) ---
+CONFIG_HZ_1000=y
+# CONFIG_HZ_250 is not set
+# CONFIG_HZ_300 is not set
+# CONFIG_NO_HZ_IDLE is not set
+CONFIG_NO_HZ_FULL=y
+CONFIG_PREEMPT_VOLUNTARY=y
+# CONFIG_PREEMPT_NONE is not set
+
+# --- memory / swap ---
+CONFIG_ZSWAP=y
+CONFIG_ZSWAP_COMPRESSOR_DEFAULT_ZSTD=y
+# CONFIG_ZSWAP_COMPRESSOR_DEFAULT_LZO is not set
+CONFIG_ZBUD=y
+CONFIG_ZSMALLOC=y
+CONFIG_ZRAM=m
+CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y
+
+# --- cpu / power ---
+CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
+CONFIG_X86_AMD_PSTATE=y
+CONFIG_X86_INTEL_PSTATE=y
+CONFIG_SMP=y
+CONFIG_NR_CPUS=512
+
+# --- networking ---
+CONFIG_TCP_CONG_BBR=y
+CONFIG_DEFAULT_FQ_CODEL=y
+# CONFIG_DEFAULT_PFIFO_FAST is not set
+CONFIG_WIREGUARD=m
+CONFIG_NETFILTER_XT_MATCH_BPF=m
+
+# --- filesystems (live images + usb sticks + windows dual-boot) ---
+CONFIG_SQUASHFS=y
+CONFIG_SQUASHFS_ZSTD=y
+CONFIG_SQUASHFS_XZ=y
+CONFIG_OVERLAY_FS=y
+CONFIG_EXFAT_FS=y
+CONFIG_NTFS3_FS=m
+CONFIG_TMPFS_POSIX_ACL=y
+CONFIG_EXT4_FS_POSIX_ACL=y
+
+# --- drm / gpu (kept as modules) ---
+CONFIG_DRM_I915=m
+CONFIG_DRM_AMDGPU=m
+CONFIG_DRM_NOUVEAU=m
+CONFIG_DRM_VMWGFX=m
+CONFIG_DRM_VIRTIO_GPU=m
+
+# --- sound (kiosk/browser audio) ---
+CONFIG_SND_HDA_INTEL=m
+CONFIG_SND_SOC_SOF_HDA=m
+CONFIG_SND_USB_AUDIO=m
+
+# --- usb / input / gamepads ---
+CONFIG_USB_HID=y
+CONFIG_HID_GENERIC=y
+CONFIG_INPUT_EVDEV=y
+CONFIG_INPUT_JOYSTICK=y
+CONFIG_INPUT_JOYDEV=m
+CONFIG_USB_SERIAL=y
+
+# --- virt (run eaglercraft servers / test vms) ---
+CONFIG_KVM_AMD=m
+CONFIG_KVM_INTEL=m
+CONFIG_VHOST_NET=m
+
+# --- security (debian defaults) ---
+CONFIG_SECURITY_APPARMOR=y
+CONFIG_DEFAULT_SECURITY_APPARMOR=y
+CONFIG_STACKPROTECTOR_STRONG=y
+CONFIG_MAGIC_SYSRQ=y
+
+# --- size / logging ---
+CONFIG_DEBUG_INFO_NONE=y
+# CONFIG_DEBUG_INFO_BTF is not set
+CONFIG_PRINTK_TIME=n
+CONFIG_LOG_BUF_SHIFT=18

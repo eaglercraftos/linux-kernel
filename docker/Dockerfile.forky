@@ -1,0 +1,20 @@
+# Builder image: eaglercraftos-builder:forky
+# Debian 14 (forky) build environment for linux-eaglercraftos (kernel 7.0.14).
+#
+#   docker build -f docker/Dockerfile.forky -t eaglercraftos-builder:forky .
+#   ./scripts/build.sh --debian forky --arch amd64 --image eaglercraftos-builder:forky
+#
+# NOTE: build on the matching arch (amd64 image on amd64 host, arm64 on arm64).
+# No QEMU / no cross-compilation.
+FROM debian:forky-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq \
+  && apt-get install -y -qq --no-install-recommends \
+    build-essential gcc-14 g++-14 bc bison flex libssl-dev libelf-dev \
+    libncurses-dev dwarves pahole zstd debhelper rsync kmod cpio python3 \
+    perl git curl xz-utils tar patch ca-certificates ccache \
+    dpkg-dev apt-utils \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work

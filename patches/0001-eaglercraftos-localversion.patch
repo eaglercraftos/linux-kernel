@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: EaglercraftOS <build@eaglercraftos.local>
+Date: Mon, 1 Jan 2024 00:00:00 +0000
+Subject: [PATCH] eaglercraftos: set LOCALVERSION and default hostname hooks
+
+Applies EaglercraftOS branding on top of vanilla 7.0.14 without touching
+code: stable -eaglercraftos release string and sane defaults for the
+deb-pkg build helpers.
+
+---
+ Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 111111111111..222222222222 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ VERSION = 7
+ PATCHLEVEL = 0
+ SUBLEVEL = 14
+-EXTRAVERSION =
++EXTRAVERSION = -eaglercraftos
+ NAME = EaglercraftOS Hopper
+
+ # *DOCUMENTATION*
+--
+2.43.0

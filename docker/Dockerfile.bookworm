@@ -1,0 +1,20 @@
+# Builder image: eaglercraftos-builder:bookworm
+# Debian 12 (bookworm) build environment for linux-eaglercraftos (kernel 7.0.14).
+#
+#   docker build -f docker/Dockerfile.bookworm -t eaglercraftos-builder:bookworm .
+#   ./scripts/build.sh --debian bookworm --arch amd64 --image eaglercraftos-builder:bookworm
+#
+# NOTE: build on the matching arch (amd64 image on amd64 host, arm64 on arm64).
+# No QEMU / no cross-compilation.
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq \
+  && apt-get install -y -qq --no-install-recommends \
+    build-essential bc bison flex libssl-dev libelf-dev libncurses-dev \
+    dwarves pahole zstd debhelper rsync kmod cpio python3 perl git curl \
+    xz-utils tar patch ca-certificates ccache \
+    dpkg-dev apt-utils \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
